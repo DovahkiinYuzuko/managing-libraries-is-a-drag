@@ -24,9 +24,9 @@ def parse_rules() -> dict:
         sys.exit(2)
 
     content = rules_path.read_text(encoding="utf-8")
-    front_matter = re.search(r'^---\n(.*?)\n---', content, re.DOTALL | re.MULTILINE)
+    front_matter = re.search(r'```yaml\n(.*?)\n```', content, re.DOTALL)
     if not front_matter:
-        sys.stderr.write("Error: YAML front matter not found in rules.md\n")
+        sys.stderr.write("Error: YAML code block not found in rules.md\n")
         sys.exit(2)
 
     yaml_str = front_matter.group(1)
@@ -83,8 +83,9 @@ def fetch_license(system: str, name: str, version: str) -> str:
     """Fetch SPDX license identifier(s) from the deps.dev API."""
     encoded = urllib.parse.quote(name, safe="")
     url = f"https://api.deps.dev/v3/systems/{system}/packages/{encoded}/versions/{version}"
+    req = urllib.request.Request(url, headers={"User-Agent": "managing-libraries-is-a-drag/1.0"})
     try:
-        with urllib.request.urlopen(url) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
             licenses = data.get("licenses", [])
             return " OR ".join(licenses) if licenses else "Unknown"
@@ -104,18 +105,34 @@ def check_license(license_str: str, deny_list: list[str], name: str) -> None:
             sys.exit(1)
 
 
-def upsert_warehouse(wh_path: Path, system: str, name: str, full_entry: str) -> None:
+def upsert_warehouse(wh_path: Path, raw_template: str, name: str, full_entry: str) -> None:
     """
     Insert or update a library entry in the warehouse file.
     - The first line of full_entry is the '## system' section header.
+    - The "key line" (the line containing the library name) is identified
+      dynamically from raw_template by locating the line with {Library Name}
+      or [Library Name], so this does not break if the template wording changes.
     - Creates the section if missing.
     - Replaces the existing entry if found; otherwise inserts alphabetically.
     """
+    raw_lines = raw_template.rstrip().splitlines()
+    key_line_template = next(
+        (l for l in raw_lines if "{Library Name}" in l or "[Library Name]" in l), None
+    )
+    if key_line_template is None:
+        sys.stderr.write("Error: format_template has no line identifying the library name\n")
+        sys.exit(2)
+
+    # Build a regex that matches the prefix of the key line up to the variable,
+    # so we can recognize the corresponding rendered line regardless of wording.
+    prefix = re.split(r'\{Library Name\}|\[Library Name\]', key_line_template)[0]
+    key_line_pattern = re.compile(r'^' + re.escape(prefix))
+
     entry_lines_raw = full_entry.rstrip().splitlines()
-    section_header  = entry_lines_raw[0]           # e.g. "## npm"
-    body_lines      = entry_lines_raw[1:]           # the bullet lines
+    section_header  = entry_lines_raw[0]            # e.g. "## npm"
+    body_lines      = entry_lines_raw[1:]            # the bullet lines
     entry_marker    = next(
-        (l for l in body_lines if l.startswith("- **[Library Name]:**")), None
+        (l for l in body_lines if key_line_pattern.match(l)), None
     )
     body_with_nl = [l + "\n" for l in body_lines]
 
@@ -150,15 +167,15 @@ def upsert_warehouse(wh_path: Path, system: str, name: str, full_entry: str) -> 
     if entry_start is not None:
         entry_end = next(
             (i for i in range(entry_start + 1, sec_end)
-             if lines[i].startswith("- **[Library Name]:**")),
+             if key_line_pattern.match(lines[i])),
             sec_end
         )
         new_lines = lines[:entry_start] + body_with_nl + lines[entry_end:]
     else:
         insert_at = sec_end
         for i in range(sec_start + 1, sec_end):
-            if lines[i].startswith("- **[Library Name]:**"):
-                existing = lines[i].replace("- **[Library Name]:** ", "").strip()
+            if key_line_pattern.match(lines[i]):
+                existing = key_line_pattern.sub("", lines[i]).strip()
                 if name.lower() < existing.lower():
                     insert_at = i
                     break
@@ -231,7 +248,7 @@ def main() -> None:
 
     registry_url = REGISTRY_URLS.get(args.system, "").format(name=args.name)
 
-    upsert_warehouse(Path(rules["warehouse_path"]), args.system, args.name, entry)
+    upsert_warehouse(Path(rules["warehouse_path"]), rules["format_template"], args.name, entry)
     upsert_notice(Path(rules["license_path"]), args.name, version or "", license_str, registry_url)
 
     print(f"Done: '{args.name}' has been added/updated.")

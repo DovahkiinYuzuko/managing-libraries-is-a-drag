@@ -1,0 +1,14 @@
+*
+
+!.gitignore
+
+!SKILL.md
+
+# references/
+!references/
+!references/**
+
+# scripts/
+!scripts/
+!scripts/**
+

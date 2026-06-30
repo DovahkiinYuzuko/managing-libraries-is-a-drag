@@ -16,9 +16,9 @@ def parse_rules() -> list[str]:
         sys.exit(1)
 
     content = rules_path.read_text(encoding="utf-8")
-    match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL | re.MULTILINE)
+    match = re.search(r'```yaml\n(.*?)\n```', content, re.DOTALL)
     if not match:
-        sys.stderr.write("Error: YAML front matter not found in rules.md\n")
+        sys.stderr.write("Error: YAML code block not found in rules.md\n")
         sys.exit(1)
 
     ignore_match = re.search(r'ignore_packages:\s*\n((?:\s+-\s*".*?"\s*\n?)*)', match.group(1))
@@ -46,16 +46,32 @@ def check_tool(tool: str) -> None:
         sys.exit(2)
 
 
+def check_subcommand(args: list[str]) -> None:
+    """Exit with code 2 if a CLI subcommand (e.g. cargo-udeps) is not installed."""
+    try:
+        subprocess.run(args, capture_output=True, text=True)
+    except FileNotFoundError:
+        sys.stderr.write(f"Error: '{' '.join(args)}' is not available\n")
+        sys.exit(2)
+
+
 def detect_unused_npm(ignores: list[str]) -> list[tuple[str, str]]:
     check_tool("depcheck")
+    # depcheck は未使用パッケージを検出した場合でも非ゼロを返すため、
+    # ここでは check=True を使わず stdout の内容だけを見る
     res = subprocess.run(["depcheck", "--json"], capture_output=True, text=True)
-    data = json.loads(res.stdout)
+    try:
+        data = json.loads(res.stdout)
+    except json.JSONDecodeError:
+        sys.stderr.write(f"Error: depcheck returned invalid JSON: {res.stdout[:200]}\n")
+        sys.exit(1)
     unused = data.get("dependencies", []) + data.get("devDependencies", [])
     return [("npm", pkg) for pkg in unused if pkg not in ignores]
 
 
 def detect_unused_cargo(ignores: list[str]) -> list[tuple[str, str]]:
     check_tool("cargo")
+    check_subcommand(["cargo", "udeps", "--help"])
     res = subprocess.run(["cargo", "udeps"], capture_output=True, text=True)
     matches = re.findall(r'unused dependencies:(.*?)(?:\n\n|\Z)', res.stderr, re.DOTALL)
     pkgs = re.findall(r'^\s+(.*?)(?:\s|$)', matches[0], re.MULTILINE) if matches else []
