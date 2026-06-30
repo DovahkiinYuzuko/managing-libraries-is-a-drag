@@ -25,7 +25,7 @@
 本スキルは、オープンエージェントスキルエコシステムのパッケージマネージャーである `npx skills` を使用してインストールできます。
 
 ```bash
-npx skills add managing-libraries-is-a-drag
+npx skills add DovahkiinYuzuko/managing-libraries-is-a-drag
 ```
 
 ### 使用方法
@@ -59,7 +59,7 @@ This skill is an AI agent skill designed to automate data retrieval and updating
 This skill can be installed using `npx skills`, the package manager for the open agent skill ecosystem.
 
 ```bash
-npx skills add managing-libraries-is-a-drag
+npx npx skills add DovahkiinYuzuko/managing-libraries-is-a-drag
 ```
 
 ### Usage
