@@ -2,7 +2,10 @@
 
 !.gitignore
 
+# root
 !SKILL.md
+!README.md
+!LICENSE
 
 # references/
 !references/
