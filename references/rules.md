@@ -17,7 +17,7 @@ Every entry written to the warehouse file must strictly adhere to the following 
 
 ```markdown
 ## [Language]
-- **[Library Name]:** {Library Name}
+- **Library Name:** {Library Name}
 - **Description:** {Description}
 - **Rationale:** {Rationale}
 - **Version:** {Version}
