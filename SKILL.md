@@ -13,7 +13,7 @@ To document ALL newly added libraries that require third-party license disclosur
 2. Check `references/rules.md` to see if the ecosystem is supported by the lookup script.
 3. Autonomously draft the Description and Rationale for each identified library based on the context to minimize user typing.
 4. Present the drafted Descriptions and Rationales to the user and wait for confirmation. Do NOT proceed without explicit user approval ("Yes").
-5. Once confirmed, for each supported ecosystem, run the script:
+5. Locate the repository root folder where this `SKILL.md` and the `scripts/` directory reside. Once confirmed, run the script for each supported ecosystem:
    - Command: `python PATH/to/scripts/fetch-lib-info.py --system <ecosystem> --name <name>` (Append `--version <version>` if specified).
 6. Parse the JSON returned by the script. If `error` is not null, `api_supported` is false, or data is missing, use web search to find the correct version and license.
 7. Read `docs/using-library/lib-WH.md`. Insert or update all library entries under the correct section in alphabetical order, strictly following the format defined in `references/rules.md`.
